@@ -5,5 +5,6 @@ class Command(BaseCommand):
     help = 'Runs all jobs that are due.'
     
     def handle(self, *args, **options):
+        Job.objects.reset_stuck_jobs()
         for job in Job.objects.due():
             job.run()

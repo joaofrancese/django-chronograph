@@ -2,7 +2,7 @@ from StringIO import StringIO
 from dateutil import rrule
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
+from django.core.mail import send_mail, mail_admins
 from django.db import models, transaction
 from django.db.models import Q
 from django.template import loader, Context
@@ -10,6 +10,7 @@ from django.utils.encoding import smart_str
 from django.utils.timesince import timeuntil
 from django.utils.timezone import now as tz_now
 from django.utils.translation import ungettext, ugettext, ugettext_lazy as _
+import datetime
 import logging
 import shlex
 import subprocess
@@ -17,6 +18,36 @@ import sys
 import traceback
 
 class JobManager(models.Manager):
+    def reset_stuck_jobs(self):
+        """
+        Marks jobs that have been running for longer than X minutes as no longer running.
+        This interval can be set with Django settings, using the CHRONOGRAPH_MAX_RUNNING_TIME (in minutes).
+        Default = 120 (2 hours). Set to 0 or None to disable.
+        """
+        time_limit = getattr(settings, 'CHRONOGRAPH_MAX_RUNNING_TIME', 120)
+        if not time_limit:
+            return 0
+        now = datetime.datetime.now()
+        started_on_limit = now - datetime.timedelta(minutes=time_limit)
+        stuck_jobs = self.filter(is_running=True, started_on__lt=started_on_limit)
+        for job in stuck_jobs:
+            time_spent = int((now - job.started_on).total_seconds() / 60)
+            subject = u"Stuck job: %s (#%s)" % (job.name, job.id)
+            error_msg = u"Job #%s (%s) was running for %s minutes, over the limit of %s. "\
+                        u"It was considered stuck and marked as no longer running." \
+                        % (job.id, job.name, time_spent, time_limit)
+            log = Log(job=job, run_date=job.started_on, end_date=now, stderr=error_msg, success=False)
+            log.save()
+            mail_admins(subject, error_msg, fail_silently=True)
+            
+            job.is_running = False
+            job.last_run = job.started_on
+            job.started_on = None
+            job.next_run = None
+            job.last_run_successful = False
+            job.save()
+        return len(stuck_jobs)
+    
     def due(self):
         """
         Returns a ``QuerySet`` of all jobs waiting to be run.
@@ -56,6 +87,7 @@ class Job(models.Model):
     next_run = models.DateTimeField(_("next run"), blank=True, null=True, help_text=_("If you don't set this it will be determined automatically"))
     adhoc_run = models.BooleanField(default=False)
     last_run = models.DateTimeField(_("last run"), editable=False, blank=True, null=True)
+    started_on = models.DateTimeField(_("started running"), editable=False, blank=True, null=True)
     is_running = models.BooleanField(_("Running?"), default=False, editable=False)
     last_run_successful = models.BooleanField(default=True, blank=False, null=False, editable=False)
     info_subscribers = models.ManyToManyField(User, related_name='info_subscribers_set', blank=True)
@@ -159,6 +191,7 @@ class Job(models.Model):
         A ``Log`` will be created if there is any output from either stdout or stderr.
         """
         run_date = tz_now()
+        self.started_on = run_date
         self.is_running = True
         self.save()
 

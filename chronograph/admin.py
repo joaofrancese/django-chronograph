@@ -61,7 +61,7 @@ class JobAdmin(admin.ModelAdmin):
     form = JobForm
     list_display = (
         'job_success', '_enabled', 'name', 'last_run_with_link', 'next_run_', 'get_timeuntil',
-        'frequency', 'is_running', 'run_button', 'view_logs_button',
+        'frequency', 'started_on', 'is_running', 'run_button', 'view_logs_button',
     )
     list_display_links = ('name',)
     list_filter = ('last_run_successful', 'frequency', 'disabled')
@@ -91,7 +91,7 @@ class JobAdmin(admin.ModelAdmin):
         return queryset.update(disabled=True)
 
     def reset_jobs(self, request, queryset):
-        return queryset.update(is_running=False)
+        return queryset.update(is_running=False, started_on=None)
 
     def _enabled(self, obj):
         return not obj.disabled
@@ -178,6 +178,7 @@ class JobAdmin(admin.ModelAdmin):
 
 class LogAdmin(admin.ModelAdmin):
     list_display = ('job_name', 'run_date', 'end_date', 'job_duration', 'job_success', 'output', 'errors',)
+    list_filter = ('job', 'run_date', 'end_date', 'success')
     search_fields = ('stdout', 'stderr', 'job__name', 'job__command')
     date_hierarchy = 'run_date'
     fieldsets = (
