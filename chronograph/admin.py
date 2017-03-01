@@ -5,7 +5,6 @@ from django.contrib import admin, messages
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.forms import Textarea
-from django.forms.util import flatatt
 from django.http import HttpResponseRedirect, Http404
 from django.template.defaultfilters import linebreaks
 from django.utils import dateformat, formats
@@ -13,6 +12,10 @@ from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from django.utils.text import capfirst
 from django.utils.translation import ugettext_lazy as _
+try:
+    from django.forms.utils import flatatt  # Django >= 1.7
+except ImportError:
+    from django.forms.util import flatatt  # Django < 1.7
 
 
 class HTMLWidget(forms.Widget):
