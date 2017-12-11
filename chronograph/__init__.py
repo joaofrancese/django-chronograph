@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
-VERSION = (0, 1, 30)
+VERSION = (0, 1, 31)
 __version__ = '.'.join(map(str, VERSION))
