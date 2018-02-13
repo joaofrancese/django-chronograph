@@ -1,5 +1,6 @@
 from .models import Job, Log
 from django import forms
+from django.conf import settings
 from django.conf.urls import patterns, url
 from django.contrib import admin, messages
 from django.core.urlresolvers import reverse
@@ -7,6 +8,7 @@ from django.db import models
 from django.forms import Textarea
 from django.forms.util import flatatt
 from django.http import HttpResponseRedirect, Http404
+from django.shortcuts import redirect
 from django.template.defaultfilters import linebreaks
 from django.utils import dateformat, formats
 from django.utils.html import escape
@@ -104,16 +106,7 @@ class JobAdmin(admin.ModelAdmin):
             return None
         format_ = formats.get_format('DATETIME_FORMAT')
         value = capfirst(dateformat.format(obj.last_run, format_))
-
-        log_id = obj.log_set.latest('run_date').id
-
-        try:
-            # Old way
-            reversed_url = reverse('chronograph_log_change', args=(log_id,))
-        except:
-            # New way
-            reversed_url = reverse('admin:chronograph_log_change', args=(log_id,))
-
+        reversed_url = reverse('admin:chronograph_job_latest_log', args=[obj.pk])
         return '<a href="%s">%s</a>' % (reversed_url, value)
     last_run_with_link.allow_tags = True
     last_run_with_link.short_description = _('Last run')
@@ -130,25 +123,33 @@ class JobAdmin(admin.ModelAdmin):
     next_run_.short_description = _('Next run')
     next_run_.admin_order_field = 'next_run'
 
-
-
     def job_success(self, obj):
         return obj.last_run_successful
     job_success.short_description = _(u'OK')
     job_success.boolean = True
 
     def run_button(self, obj):
-        disabled = 'disabled="disabled" ' if obj.adhoc_run else ''
-        on_click = "window.location='%d/run/?inline=1';" % obj.id
-        return '<input type="button" onclick="%s" value="Run" %s/>' % (on_click, disabled)
+        if obj.adhoc_run or obj.is_running:
+            return '-'
+        reversed_url = reverse('admin:chronograph_job_run', args=[obj.pk]) + '?inline=1'
+        return '<a href="%s" class="btn btn-default">Run</a>' % reversed_url
     run_button.allow_tags = True
     run_button.short_description = _('Run')
 
     def view_logs_button(self, obj):
-        on_click = "window.location='../log/?job=%d';" % obj.id
-        return '<input type="button" onclick="%s" value="View Logs" />' % on_click
+        reversed_url = reverse('admin:chronograph_log_changelist') + '?job=%d' % obj.pk
+        return '<a href="%s" class="btn btn-default">View Logs</a>' % reversed_url
     view_logs_button.allow_tags = True
     view_logs_button.short_description = _('Logs')
+    
+    def latest_log_job_view(self, request, pk):
+        log_qs = Log.objects.filter(job_id=pk).order_by('-run_date')[0:1]
+        if log_qs:
+            return redirect('admin:chronograph_log_change', log_qs[0].pk)
+        else:
+            job = Job.objects.get(pk=pk)
+            messages.error(request, 'The job "%(job)s" has no log entries.' % {'job': job.name})
+            return redirect('admin:chronograph_job_changelist')
 
     def run_job_view(self, request, pk):
         """
@@ -173,11 +174,13 @@ class JobAdmin(admin.ModelAdmin):
         urls = super(JobAdmin, self).get_urls()
         my_urls = patterns('',
             url(r'^(.+)/run/$', self.admin_site.admin_view(self.run_job_view), name="chronograph_job_run"),
+            url(r'^(.+)/latest-log/$', self.admin_site.admin_view(self.latest_log_job_view), name="chronograph_job_latest_log"),
         )
         return my_urls + urls
 
 class LogAdmin(admin.ModelAdmin):
     list_display = ('job_name', 'run_date', 'end_date', 'job_duration', 'job_success', 'output', 'errors',)
+    list_select_related = ('job',)
     list_filter = ('job', 'run_date', 'end_date', 'success')
     search_fields = ('stdout', 'stderr', 'job__name', 'job__command')
     date_hierarchy = 'run_date'
