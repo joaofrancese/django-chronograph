@@ -195,7 +195,7 @@ class Job(models.Model):
         self.is_running = True
         self.save()
 
-        stdout_str, stderr_str = "", ""
+        stdout_str, stderr_str = u"", u""
 
         try:
             if self.shell_command:
@@ -283,7 +283,7 @@ class Job(models.Model):
         """
         Returns the stdout, stderr and success of a command being run.
         """
-        stdout_str, stderr_str = "", ""
+        stdout_str, stderr_str = u"", u""
         command = self.shell_command + ' ' + (self.args or '')
         if self.run_in_shell:
             command = _escape_shell_command(command)
@@ -297,7 +297,7 @@ class Job(models.Model):
 
             stdout_str, stderr_str = proc.communicate()
             if proc.returncode:
-                stderr_str += "\n\n*** Process ended with return code %d\n\n" % proc.returncode
+                stderr_str += u"\n\n*** Process ended with return code %d\n\n" % proc.returncode
             success = not proc.returncode
         except Exception, e:
             stderr_str += self._get_exception_string(e, sys.exc_info())
@@ -354,8 +354,10 @@ class Log(models.Model):
 
         for user in subscriber_set:
             subscribers.append('"%s" <%s>' % (user.get_full_name(), user.email))
+        if not subscribers:
+            return
 
-        message_body = """
+        message_body = u"""
 ********************************************************************************
 JOB NAME: %(job_name)s
 RUN DATE: %(run_date)s
@@ -370,14 +372,14 @@ SUCCESSFUL: %(success)s
 }
 
         if not self.success:
-            message_body += """
+            message_body += u"""
 ********************************************************************************
 ERROR OUTPUT
 ********************************************************************************
 %(error_output)s
 """ % {'error_output': self.stderr}
 
-        message_body += """
+        message_body += u"""
 ********************************************************************************
 INFORMATIONAL OUTPUT
 ********************************************************************************
