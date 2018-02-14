@@ -343,6 +343,9 @@ class Log(models.Model):
             return None
 
     def email_subscribers(self, is_info=False):
+        if getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
+            return
+
         subscribers = []
 
         if is_info:

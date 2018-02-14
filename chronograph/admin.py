@@ -69,7 +69,8 @@ class JobAdmin(admin.ModelAdmin):
     list_filter = ('last_run_successful', 'frequency', 'disabled')
     search_fields = ('name',)
     ordering = ('last_run',)
-    filter_horizontal = ('subscribers', 'info_subscribers')
+    if not getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
+        filter_horizontal = ('subscribers', 'info_subscribers')
 
     fieldsets = (
         (_('Job Details'), {
@@ -85,6 +86,8 @@ class JobAdmin(admin.ModelAdmin):
             'fields': ('frequency', 'next_run', 'params',)
         }),
     )
+    if getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
+        fieldsets = (fieldsets[0], fieldsets[2])
 
     def enable_jobs(self, request, queryset):
         return queryset.update(disabled=False)
