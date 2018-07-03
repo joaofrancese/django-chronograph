@@ -70,7 +70,7 @@ class JobAdmin(admin.ModelAdmin):
     list_display_links = ('name',)
     list_filter = ('last_run_successful', 'frequency', 'disabled')
     search_fields = ('name',)
-    ordering = ('last_run',)
+    ordering = ('-is_running', '-adhoc_run', 'disabled', 'next_run')
     if not getattr(settings, 'CHRONOGRAPH_DISABLE_EMAIL_SUBSCRIPTION', False):
         filter_horizontal = ('subscribers', 'info_subscribers')
 
