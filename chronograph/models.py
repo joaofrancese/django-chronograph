@@ -101,7 +101,7 @@ class Job(models.Model):
     def __unicode__(self):
         if self.disabled:
             return _(u"%(name)s - disabled") % {'name': self.name}
-        return u"%s - %s" % (self.name, self.timeuntil)
+        return self.name
 
     def save(self, *args, **kwargs):
         if not self.disabled:

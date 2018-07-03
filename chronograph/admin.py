@@ -188,12 +188,22 @@ class LogAdmin(admin.ModelAdmin):
     date_hierarchy = 'run_date'
     fieldsets = (
         (None, {
-            'fields': ('job',)
+            'fields': ('job', 'run_date', 'end_date', 'job_duration', 'job_success')
         }),
         (_('Output'), {
-            'fields': ('stdout', 'stderr',)
+            'fields': ('stdout_pre', 'stderr_pre',)
         }),
     )
+    readonly_fields = ['job', 'run_date', 'end_date', 'job_duration', 'job_success', 'stdout_pre', 'stderr_pre']
+    LOG_TEXT_TRUNCATE_CHARS = 40
+    
+    def get_queryset(self, request):
+        qs = super(LogAdmin, self).get_queryset(request)
+        if request.resolver_match.func.func_name == 'changelist_view':
+            chars = self.LOG_TEXT_TRUNCATE_CHARS + 1
+            extra_select = {'stdout_trunc': 'left(stdout, %s)' % chars, 'stderr_trunc': 'left(stderr, %s)' % chars}
+            qs = qs.defer('stdout', 'stderr').extra(select=extra_select)
+        return qs
 
     def job_duration(self, obj):
         return "%s" % (obj.get_duration())
@@ -209,18 +219,30 @@ class LogAdmin(admin.ModelAdmin):
     job_success.boolean = True
 
     def output(self, obj):
-        result = obj.stdout or ''
-        if len(result) > 40:
-            result = result[:40] + '...'
-
+        result = (obj.stdout_trunc if hasattr(obj, 'stdout_trunc') else obj.stdout) or ''
+        if len(result) > self.LOG_TEXT_TRUNCATE_CHARS:
+            result = result[:self.LOG_TEXT_TRUNCATE_CHARS] + '...'
         return result or _('(No output)')
 
     def errors(self, obj):
-        result = obj.stderr or ''
-        if len(result) > 40:
-            result = result[:40] + '...'
-
+        result = (obj.stderr_trunc if hasattr(obj, 'stderr_trunc') else obj.stderr) or ''
+        if len(result) > self.LOG_TEXT_TRUNCATE_CHARS:
+            result = result[:self.LOG_TEXT_TRUNCATE_CHARS] + '...'
         return result or _('(No errors)')
+    
+    def stdout_pre(self, obj):
+        if not obj.stdout:
+            return _('(No output)')
+        return "<pre>%s</pre>" % escape(obj.stdout).replace('\n', '<br/>')
+    stdout_pre.short_description = _('output')
+    stdout_pre.allow_tags = True
+    
+    def stderr_pre(self, obj):
+        if not obj.stderr:
+            return _('(No errors)')
+        return "<pre>%s</pre>" % escape(obj.stderr).replace('\n', '<br/>')
+    stderr_pre.short_description = _('errors')
+    stderr_pre.allow_tags = True
 
     def has_add_permission(self, request):
         return False
