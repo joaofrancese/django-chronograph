@@ -7,4 +7,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         Job.objects.reset_stuck_jobs()
         for job in Job.objects.due():
-            job.run()
+            if Job.objects.is_job_due(job):
+                job.run()
