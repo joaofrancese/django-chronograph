@@ -48,11 +48,20 @@ class JobManager(models.Manager):
             job.save()
         return len(stuck_jobs)
     
+    def due_jobs_filter_query(self):
+        return (Q(next_run__lte=tz_now(), disabled=False, is_running=False) | Q(adhoc_run=True, is_running=False))
+    
     def due(self):
         """
         Returns a ``QuerySet`` of all jobs waiting to be run.
         """
-        return self.filter(Q(next_run__lte=tz_now(), disabled=False, is_running=False) | Q(adhoc_run=True, is_running=False))
+        return self.filter(self.due_jobs_filter_query())
+
+    def is_job_due(self, job):
+        """
+        Check if the Job is still due to be executed.
+        """
+        return Job.objects.filter(Q(id=job.pk), self.due_jobs_filter_query()).count() > 0
 
 # A lot of rrule stuff is from django-schedule
 freqs = (("YEARLY", _("Yearly")),
