@@ -184,7 +184,7 @@ class Job(models.Model):
         """
         args = []
         options = {}
-        for arg in self.args.split():
+        for arg in shlex.split(self.args):
             if arg.find('=') > -1:
                 key, value = arg.split('=')
                 options[smart_str(key)] = smart_str(value)
